@@ -478,10 +478,10 @@
       <div class="phase-meta"><span>Status</span><b>Accepting entries</b></div>
     </div>
     <div class="phase locked" id="phase-gtd" onclick="openGtdPanel()">
-      <span class="phase-tag closed">Locked</span>
+      <span class="phase-tag open">Open now</span>
       <h3>GTD</h3>
       <p>Guaranteed whitelist spot.</p>
-      <div class="phase-meta"><span>Status</span><b>Locked</b></div>
+      <div class="phase-meta"><span>Status</span><b>Accepting checks</b></div>
     </div>
   </div>
 
@@ -497,11 +497,11 @@
         </label>
         <label class="task-item">
           <input type="checkbox">
-          <span>Like &amp; retweet <a href="https://twitter.com/ErasedEth/status/2069796449139781837" target="_blank">this post</a></span>
+          <span>Like &amp; retweet <a href="https://twitter.com/ErasedEth/status/0000000000" target="_blank">this post</a></span>
         </label>
         <label class="task-item">
           <input type="checkbox">
-          <span>Comment &amp; tag two friends in <a href="https://twitter.com/ErasedEth/status/2069796449139781837" target="_blank">this post</a></span>
+          <span>Comment &amp; tag two friends in <a href="https://twitter.com/ErasedEth/status/0000000000" target="_blank">this post</a></span>
         </label>
       </div>
 
@@ -525,20 +525,32 @@
     <div class="gtd-inner" id="gtdInner">
       <h3>Check your GTD eligibility</h3>
       <p class="sub-note">Enter the wallet you used for FCFS to check your status.</p>
-      <div class="field">
-        <label for="gtdWallet">Wallet address</label>
-        <input type="text" id="gtdWallet" placeholder="0x...">
+      <div id="gtdCheckFields">
+        <div class="field">
+          <label for="gtdWallet">Wallet address</label>
+          <input type="text" id="gtdWallet" placeholder="0x...">
+        </div>
+        <button type="button" class="submit-btn" id="gtdCheckBtn" onclick="checkGtdEligibility()">Check eligibility</button>
       </div>
-      <button type="button" class="submit-btn" id="gtdCheckBtn" onclick="checkGtdEligibility()">Check eligibility</button>
       <div class="status-msg" id="gtdStatusMsg"></div>
-
-      <div class="tasklist" id="gtdTasks" style="display:none;margin-top:24px;">
-        <div class="sub-note" style="margin-bottom:14px;">You're eligible. Complete these to confirm your GTD spot:</div>
-        <label class="task-item"><input type="checkbox"><span>Follow <a href="https://twitter.com/ErasedEth" target="_blank">@ErasedEth</a></span></label>
-        <label class="task-item"><input type="checkbox"><span>Like &amp; retweet <a href="https://twitter.com/ErasedEth/status/2069796449139781837" target="_blank">the GTD announcement</a></span></label>
-        <button type="button" class="submit-btn" style="margin-top:18px;" onclick="confirmGtd()">Confirm GTD spot</button>
-      </div>
+      <button type="button" class="submit-btn" id="gtdApplyBtn" style="display:none;margin-top:18px;" onclick="openGtdApplyPanel()">Apply for GTD here</button>
     </div>
+  </div>
+
+  <div class="formwrap gtd-panel" id="gtdApplyPanel" style="display:none;">
+    <h3>GTD Application</h3>
+    <p class="sub-note">Complete every task below, then confirm your GTD application.</p>
+    <div class="tasklist" id="gtdTasks">
+      <label class="task-item"><input type="checkbox"><span>Follow <a href="https://twitter.com/ErasedEth" target="_blank">@ErasedEth</a></span></label>
+      <label class="task-item"><input type="checkbox"><span>Like &amp; retweet <a href="https://twitter.com/ErasedEth/status/0000000000" target="_blank">the GTD announcement</a></span></label>
+      <label class="task-item"><input type="checkbox"><span>Comment on <a href="https://twitter.com/ErasedEth/status/0000000000" target="_blank">the GTD announcement</a></span></label>
+    </div>
+    <div class="field" id="gtdProofField">
+      <label for="gtdProof">Comment proof link</label>
+      <input type="url" id="gtdProof" placeholder="https://twitter.com/yourhandle/status/...">
+    </div>
+    <button type="button" class="submit-btn" id="gtdConfirmBtn" onclick="confirmGtd()">Confirm GTD application</button>
+    <div class="status-msg" id="gtdApplyStatusMsg"></div>
   </div>
 </section>
 
@@ -551,11 +563,13 @@
 <script>
   // ===== CONFIG =====
   // Replace with your deployed Google Apps Script Web App URL
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzf2IGzG_Ltg1igrTtN9FMebAT9eYgUtG4Wr8aMh-y7r0wvHEzvYiL5nl-zNiTaFTH/exec";
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwIzWc934hWKS21Ehd89Kr6mbN3TnM7ish8NrMbjEJoiI3CsPNRWInTvpw-wP8XSUtK/exec";
 
   const form = document.getElementById('wlForm');
   const btn = document.getElementById('submitBtn');
   const msg = document.getElementById('statusMsg');
+  let eligibleGtdWallet = '';
+  let eligibleGtdData = null;
 
   form.addEventListener('submit', async function(e){
     e.preventDefault();
@@ -616,7 +630,7 @@
 
   // ===== FCFS STATE =====
   // Flip this to true once FCFS officially closes — unlocks the GTD checker for real
-  const FCFS_CLOSED = false;
+  const FCFS_CLOSED = true;
 
   function openFcfsPanel(){
     const panel = document.getElementById('gtdPanel');
@@ -628,6 +642,7 @@
     fcfsCard.classList.add('active');
 
     panel.style.display = 'none';
+    document.getElementById('gtdApplyPanel').style.display = 'none';
     fcfsPanel.style.display = 'block';
     fcfsPanel.scrollIntoView({behavior:'smooth', block:'center'});
   }
@@ -642,17 +657,27 @@
     fcfsCard.classList.remove('active');
     gtdCard.classList.add('active');
 
-    // hide FCFS form, show only the GTD checker panel
+    // hide FCFS form and application panel, show only the GTD checker panel
     fcfsPanel.style.display = 'none';
+    document.getElementById('gtdApplyPanel').style.display = 'none';
+    document.getElementById('gtdCheckFields').style.display = 'block';
+    document.getElementById('gtdApplyBtn').style.display = 'none';
+    document.getElementById('gtdStatusMsg').className = 'status-msg';
+    document.getElementById('gtdStatusMsg').textContent = '';
     panel.style.display = 'block';
     panel.scrollIntoView({behavior:'smooth', block:'center'});
   }
 
   async function checkGtdEligibility(){
     const gtdMsg = document.getElementById('gtdStatusMsg');
-    const gtdTasks = document.getElementById('gtdTasks');
+    const checkFields = document.getElementById('gtdCheckFields');
+    const applyBtn = document.getElementById('gtdApplyBtn');
     const checkBtn = document.getElementById('gtdCheckBtn');
     const wallet = document.getElementById('gtdWallet').value.trim();
+
+    applyBtn.style.display = 'none';
+    eligibleGtdWallet = '';
+    eligibleGtdData = null;
 
     if(!FCFS_CLOSED){
       gtdMsg.textContent = 'GTD checks open once FCFS officially closes.';
@@ -673,13 +698,15 @@
       checkBtn.textContent = 'Check eligibility';
 
       if(data && data.eligible){
+        eligibleGtdWallet = wallet;
+        eligibleGtdData = data;
+        checkFields.style.display = 'none';
         gtdMsg.textContent = "You're eligible for GTD.";
         gtdMsg.className = 'status-msg success';
-        gtdTasks.style.display = 'block';
+        applyBtn.style.display = 'block';
       } else {
-        gtdMsg.textContent = 'This wallet has no FCFS entry on record.';
+        gtdMsg.textContent = 'You are not eligible for GTD.';
         gtdMsg.className = 'status-msg error';
-        gtdTasks.style.display = 'none';
       }
     }, function(){
       checkBtn.disabled = false;
@@ -711,19 +738,69 @@
     document.body.appendChild(script);
   }
 
-  function confirmGtd(){
-    const gtdMsg = document.getElementById('gtdStatusMsg');
+  function openGtdApplyPanel(){
+    if(!eligibleGtdWallet){
+      const gtdMsg = document.getElementById('gtdStatusMsg');
+      gtdMsg.textContent = 'Please check your wallet eligibility first.';
+      gtdMsg.className = 'status-msg error';
+      return;
+    }
+
+    document.getElementById('gtdPanel').style.display = 'none';
+    document.getElementById('gtdApplyPanel').style.display = 'block';
+    document.getElementById('gtdApplyPanel').scrollIntoView({behavior:'smooth', block:'center'});
+  }
+
+  async function confirmGtd(){
+    const gtdMsg = document.getElementById('gtdApplyStatusMsg');
+    const confirmBtn = document.getElementById('gtdConfirmBtn');
+    const proof = document.getElementById('gtdProof').value.trim();
     const tasksDone = Array.from(document.querySelectorAll('#gtdTasks input[type="checkbox"]'))
       .every(cb => cb.checked);
 
+    if(!eligibleGtdWallet){
+      gtdMsg.textContent = 'Please check your wallet eligibility first.';
+      gtdMsg.className = 'status-msg error';
+      return;
+    }
     if(!tasksDone){
       gtdMsg.textContent = 'Please complete all tasks above before confirming.';
       gtdMsg.className = 'status-msg error';
       return;
     }
+    if(!proof || !proof.startsWith('http')){
+      gtdMsg.textContent = 'Please paste your comment proof link.';
+      gtdMsg.className = 'status-msg error';
+      return;
+    }
 
-    gtdMsg.textContent = 'GTD spot confirmed. See you at mint.';
-    gtdMsg.className = 'status-msg success';
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Confirming...';
+
+    try {
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({
+          wallet: eligibleGtdWallet,
+          twitter: eligibleGtdData && eligibleGtdData.twitter ? eligibleGtdData.twitter : '',
+          proof: proof,
+          phase: 'GTD_CONFIRM',
+          timestamp: new Date().toISOString()
+        })
+      });
+      gtdMsg.textContent = 'GTD application confirmed. See you at mint.';
+      gtdMsg.className = 'status-msg success';
+      document.getElementById('gtdTasks').style.display = 'none';
+      document.getElementById('gtdProofField').style.display = 'none';
+      confirmBtn.style.display = 'none';
+    } catch(err) {
+      gtdMsg.textContent = 'Could not confirm right now. Try again shortly.';
+      gtdMsg.className = 'status-msg error';
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm GTD application';
+    }
   }
 
   // Unlock the GTD panel visually once FCFS closes
